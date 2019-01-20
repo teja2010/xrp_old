@@ -11,4 +11,21 @@ xdp \[reverse\] proxy,
 | 4. HTTP: port and address change ; simple load balancer | (URI, daddr1, dport1) <--> (URI, daddr2, dport2) | XDP_TX |
 
 
+
+setup:
+
+1. install clang and llvm.
+2. download your kernel from kernel.org and unzip into deps/kernelsrc
+   by default kernel-4.15 (ubuntu 18.04) src is added.
+   (will this cause Licensing issues? Dunno....)
+3. make
+4. edit xrp.config to set common options and add mappings
+5. run xrp
+
+Note:
+1. poppulate cscope.files
+```
+find deps/kernelsrc/linux-4.15/include/* deps/kernelsrc/linux-4.15/arch/* deps/kernelsrc/linux-4.15/tools/* deps/kernelsrc/linux-4.15/kernel/bpf/* -name >> cscope.files
+```
+
 such fun! much wow!
