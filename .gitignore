@@ -1,0 +1,10 @@
+.*
+*.o
+xrp
+!.gitignore
+cscope.files
+cscope.in.out
+cscope.out
+cscope.po.out
+cscope.TTT
+TAGS
