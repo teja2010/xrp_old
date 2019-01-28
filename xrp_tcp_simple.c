@@ -18,14 +18,17 @@ struct bpf_map_def SEC("maps") portmap = {
 };
 
 SEC("xdp1")
+//SEC("prog")
 int xdp_prog1(struct xdp_md *ctx)
 {
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data = (void *)(long)ctx->data;
 	struct ethhdr *eth = data;
+	struct iphdr *iph;
+	struct tcphdr *tcph;
 	long *value;
 	u16 h_proto;
-	u64 nh_off;
+	u64 nh_off, tcp_off;
 	u32 ipproto, key;
 
 	nh_off = sizeof(*eth);
@@ -54,7 +57,7 @@ int xdp_prog1(struct xdp_md *ctx)
 	}
 
 	if (h_proto == htons(ETH_P_IP)) {
-		struct iphdr *iph = data + nh_off;
+		iph = data + nh_off;
 		if (iph + 1 > data_end)
 			return XDP_PASS;
 		ipproto = iph->protocol;
@@ -65,18 +68,32 @@ int xdp_prog1(struct xdp_md *ctx)
 	if(ipproto != IPPROTO_TCP)
 		return XDP_PASS;
 	else {
-		struct tcphdr *tcph = data + nh_off;
-		if (tcph + 1 > data_end)
+		tcph = data + nh_off;
+		tcp_off = nh_off;
+		if (tcph + 2 > data_end)
 			return XDP_PASS;
-		key = ntohs(tcph->dest);
+		key = tcph->dest;
 		nh_off += sizeof(tcph);
 	}
 
 	value = bpf_map_lookup_elem(&portmap, &key);
 	if(value) {
-		char fmt[] = "dropped %d\n";
-		bpf_trace_printk(fmt, sizeof(fmt),ntohs(key));
-		return XDP_DROP;
+		char fmt1[] = "found %d->%d, csum %lx\n";
+		char fmt2[] = "one %lx, two %x, temp %x\n";
+		u32 temp = 0, temp2 = (u32)*value;
+		bpf_trace_printk(fmt1, sizeof(fmt1),ntohs(key), ntohs(*value),
+				 tcph->check);
+		temp =  (((u32)(~(tcph->check)))&0x0FFFF) +
+			(((u32)(~(tcph->dest)))&0x0FFFF) + temp2;
+		bpf_trace_printk(fmt2, sizeof(fmt2), (((u32)(~(tcph->check)))&0x0FFFF),
+				(((u32)(~(tcph->dest)))&0x0FFFF), temp);
+		
+		temp = ~((temp & 0x0FFFF) + (temp >> 16));
+		//if (tcph + 2 > data_end)
+		//	return XDP_PASS;
+		tcph->check = (u16) (temp & 0x0FFFF);
+		tcph->dest =  *value;
+		return XDP_PASS;
 	}
 
 	return XDP_PASS;
