@@ -14,6 +14,9 @@
 //#include <bpf/libbpf.h>
 #include "bpf_load.h"
 
+
+
+
 void load_simple_tcp()
 {
 	char file[] = "xrp_tcp_simple.o";
@@ -22,7 +25,7 @@ void load_simple_tcp()
 	//char dev_name[] = "wlp4s0";
 	char dev_name[] = "enp3s0";
 	
-	int input = 1;
+	int dport1 = 1, dport2 = 0;
 
 	if (load_bpf_file(file))
 		error(1, errno, "cant load %s", file);
@@ -40,17 +43,22 @@ void load_simple_tcp()
 		printf("set_link_xdp_fd failed, %s\n", strerror(errno));
 		exit(1);
 	}
+	printf("enter ports dport1 dport2\n");
+	printf("enter 0 to cleanup & exit\n");
+	printf("for all TCP connections to dport1, dest port will be"
+		"modified to dport2\n");
 
-	while(input != 0 ) {
-		printf("enter port to drop packets\n>");
-		printf("enter 0 to cleanup & exit:\n>");
-		scanf("%d",&input);
-		if(input ==0)
-			continue;
+	while(dport1 != 0 ) {
+		printf("mode 1 dport1> ");
+		scanf("%d",&dport1);
+		if(dport1 == 0)
+			break;
+		printf("mode 1 dport2> ");
+		scanf("%d",&dport2);
 
-		if(bpf_map_update_elem(map_fd[0], &input, &input, 0)) {
+		if(bpf_map_update_elem(map_fd[0], &dport1, &dport2, 0)) {
 			printf("map update failed, %s\n", strerror(errno));
-			input = 0;
+			dport1 = 0;
 		}
 	}
 
@@ -62,11 +70,16 @@ void load_simple_tcp()
 
 }
 
-
+void print_help()
+{
+	printf("1. TCP simple port change: dport ? dport <-> dport\n");
+	printf("2. HTTP port change:  URI: dport <-> dport\n");
+}
 
 int main()
 {
 	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
+	int input = 0;
 
 	printf("****** X R P ******\n");
 //	if(setrlimit(RLIMIT_MEMLOCK, &r)) {
@@ -75,7 +88,18 @@ int main()
 //	}
 
 
-	load_simple_tcp();
+	printf("enter mode:\n");
+	printf("> ");
+	scanf("%d", &input);
+
+	switch(input) {
+	case 1:
+		load_simple_tcp();
+		break;
+	default:
+		print_help();
+		break;
+	}
 
 	return 0;
 }
