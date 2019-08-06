@@ -17,11 +17,12 @@ struct bpf_map_def SEC("maps") portmap = {
 	.max_entries = 256,
 };
 
-SEC("tc_act")
-int bpf_prog(struct __sk_buff *skb)
+SEC("xdp1")
+//SEC("prog")
+int xdp_prog1(struct xdp_md *ctx)
 {
-	void *data_end = (void *)(long)skb->data_end;
-	void *data = (void *)(long)skb->data;
+	void *data_end = (void *)(long)ctx->data_end;
+	void *data = (void *)(long)ctx->data;
 	struct ethhdr *eth = data;
 	struct iphdr *iph;
 	struct tcphdr *tcph;
@@ -32,7 +33,7 @@ int bpf_prog(struct __sk_buff *skb)
 
 	nh_off = sizeof(*eth);
 	if (data + nh_off > data_end)
-		return TC_ACT_OK;
+		return XDP_PASS;
 
 	h_proto = eth->h_proto;
 
@@ -42,7 +43,7 @@ int bpf_prog(struct __sk_buff *skb)
 		vhdr = data + nh_off;
 		nh_off += sizeof(struct vlan_hdr);
 		if (data + nh_off > data_end)
-			return TC_ACT_OK;
+			return XDP_PASS;
 		h_proto = vhdr->h_vlan_encapsulated_proto;
 	}
 	if (h_proto == htons(ETH_P_8021Q) || h_proto == htons(ETH_P_8021AD)) {
@@ -51,26 +52,26 @@ int bpf_prog(struct __sk_buff *skb)
 		vhdr = data + nh_off;
 		nh_off += sizeof(struct vlan_hdr);
 		if (data + nh_off > data_end)
-			return TC_ACT_OK;
+			return XDP_PASS;
 		h_proto = vhdr->h_vlan_encapsulated_proto;
 	}
 
 	if (h_proto == htons(ETH_P_IP)) {
 		iph = data + nh_off;
 		if (iph + 1 > data_end)
-			return TC_ACT_OK;
+			return XDP_PASS;
 		ipproto = iph->protocol;
 		nh_off += sizeof(*iph);
 	} else
-		return TC_ACT_OK;
+		return XDP_PASS;
 
 	if(ipproto != IPPROTO_TCP)
-		return TC_ACT_OK;
+		return XDP_PASS;
 	else {
 		tcph = data + nh_off;
 		tcp_off = nh_off;
 		if (tcph + 2 > data_end)
-			return TC_ACT_OK;
+			return XDP_PASS;
 		key = tcph->dest;
 		nh_off += sizeof(tcph);
 	}
@@ -84,19 +85,18 @@ int bpf_prog(struct __sk_buff *skb)
 				 tcph->check);
 		temp =  (((u32)(~(tcph->check)))&0x0FFFF) +
 			(((u32)(~(tcph->dest)))&0x0FFFF) + temp2;
-		bpf_trace_printk(fmt2, sizeof(fmt2),
-				(((u32)(~(tcph->check)))&0x0FFFF),
+		bpf_trace_printk(fmt2, sizeof(fmt2), (((u32)(~(tcph->check)))&0x0FFFF),
 				(((u32)(~(tcph->dest)))&0x0FFFF), temp);
 		
 		temp = ~((temp & 0x0FFFF) + (temp >> 16));
 		//if (tcph + 2 > data_end)
-		//	return TC_ACT_OK;
+		//	return XDP_PASS;
 		tcph->check = (u16) (temp & 0x0FFFF);
 		tcph->dest =  *value;
-		return TC_ACT_OK;
+		return XDP_PASS;
 	}
 
-	return TC_ACT_OK;
+	return XDP_PASS;
 }
 
 char _license[] SEC("license") = "GPL";
