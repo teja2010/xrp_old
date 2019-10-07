@@ -10,7 +10,7 @@ xdp \[reverse\] proxy,
 | 3. TCP: port and address change ; ulta NAT |    (daddr1, dport1) <--> (daddr2, dport2) | XDP_TX |
 | 4. HTTP: port and address change ; simple load balancer | (URI, daddr1, dport1) <--> (URI, daddr2, dport2) | XDP_TX |
 
-
+Completed 1. Working on 2,3 and 4.
 
 setup:
 
